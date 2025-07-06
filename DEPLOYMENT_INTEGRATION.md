@@ -1,253 +1,157 @@
-# Blend Pool Creator - Deployment Integration Guide
+# Pool Deployment Frontend Integration
 
-This document explains how to integrate the frontend pool creator with real wallet transactions and the existing deployment scripts.
+This frontend implementation provides a complete user interface for deploying Blend Protocol lending pools, **restricted to Stellar testnet only**.
 
-## Current Status
+## Features Implemented
 
-✅ **Completed:**
-- 5-step wizard UI for pool configuration
-- Wallet connection interface (Freighter integration)
-- Real asset fetching from contract JSON files
-- Form validation and parameter presets
-- Simulated deployment flow
+### ✅ Complete Wizard Interface
+- **Step 1: Pool Basics** - Configure pool name, backstop rate, max positions, min collateral
+- **Step 2: Asset Selection** - Choose from popular testnet assets (XLM, USDC, BLND, wETH, wBTC) or add custom assets
+- **Step 3: Risk Parameters** - Select from preset risk profiles (conservative, balanced, aggressive) or customize
+- **Step 4: Emissions** - Configure supply and borrow emissions for each asset
+- **Step 5: Deploy** - Review configuration and deploy to testnet
 
-🔧 **Next Steps for Production:**
-- Replace simulated deployment with real transactions
-- Add transaction signing through connected wallet
-- Implement proper error handling for failed transactions
-- Add transaction status monitoring
+### ✅ Testnet-Only Restriction
+- Hardcoded to testnet network only
+- Uses testnet contract addresses from `frontend/lib/contracts/testnet.contracts.json`
+- All validation enforces testnet restriction
 
-## Architecture Overview
+### ✅ Comprehensive Validation
+- Form validation at each step
+- Real-time feedback for invalid configurations
+- Prevents navigation to next step until current step is valid
+- Backend validation before deployment
+
+### ✅ Wallet Integration
+- Freighter wallet connection
+- Secure secret key handling (stored in browser localStorage)
+- Keypair validation
+
+### ✅ Deployment Service
+- Complete implementation using Blend SDK v2
+- Handles pool deployment, reserve setup, and emissions configuration
+- Proper transaction building, simulation, and submission
+- Error handling and status tracking
+
+### ✅ Error Handling
+- Comprehensive error messages
+- Network error detection
+- Validation error display
+- Deployment status tracking
+
+## Files Modified/Created
+
+### Core Implementation
+- `frontend/app/create-pool/page.tsx` - Main wizard interface (testnet-only)
+- `frontend/app/services/deploymentService.ts` - Complete deployment logic
+- `frontend/app/api/deploy-pool/route.ts` - API endpoint for deployments
+
+### Components Used
+- `frontend/app/components/create-pool/PoolBasicsForm.tsx`
+- `frontend/app/components/create-pool/SelectAssetsForm.tsx`
+- `frontend/app/components/create-pool/RiskParametersForm.tsx`
+- `frontend/app/components/create-pool/EmissionsForm.tsx`
+- `frontend/app/components/create-pool/DeployStep.tsx`
+- `frontend/app/components/WalletConnect.tsx`
+
+### Configuration
+- `frontend/lib/contracts/testnet.contracts.json` - Testnet contract addresses
+
+## Testing Instructions
+
+### Prerequisites
+1. Stellar testnet account with funds
+2. Freighter wallet installed
+3. Next.js development environment
+
+### Test Steps
+
+1. **Start the development server**
+   ```bash
+   cd frontend
+   npm run dev
+   ```
+
+2. **Navigate to pool creation**
+   Go to `http://localhost:3000/create-pool`
+
+3. **Connect wallet**
+   - Connect Freighter wallet
+   - Enter deployment account public and secret keys
+   - Verify testnet restriction warning is displayed
+
+4. **Complete the wizard**
+   - **Basics**: Enter pool name, adjust settings
+   - **Assets**: Select 2-3 assets (e.g., XLM, USDC, BLND)
+   - **Risk**: Choose a preset or customize parameters
+   - **Emissions**: Set emission rates (optional)
+   - **Deploy**: Review and deploy
+
+5. **Verify deployment**
+   - Check transaction hashes on Stellar Expert
+   - Verify pool address is valid
+   - Confirm all reserves are set up
+
+### Expected Behavior
+
+- ✅ Only testnet deployments allowed
+- ✅ Form validation prevents invalid configurations
+- ✅ Clear error messages for any issues
+- ✅ Real-time deployment status updates
+- ✅ Transaction hashes and pool address provided on success
+
+## Contract Requirements
+
+The following contracts must be deployed on testnet:
+- **PoolFactory V2**: For creating new pools
+- **Oracle Mock**: For asset price feeds
+- **Asset Contracts**: XLM, USDC, BLND, wETH, wBTC, etc.
+
+Current testnet addresses are configured in `testnet.contracts.json`.
+
+## Limitations
+
+1. **Testnet Only**: Cannot deploy to mainnet or futurenet
+2. **Manual Setup**: Requires manual entry of deployment keys
+3. **Asset Validation**: Custom assets not automatically validated
+4. **Queue Times**: Some reserve operations may require waiting for queue periods
+
+## Security Notes
+
+- Secret keys are stored in browser localStorage (development only)
+- All transactions are signed client-side
+- Network restricted to testnet only
+- No mainnet deployment capabilities
+
+## Troubleshooting
+
+### Common Issues
+
+1. **"Invalid secret key"**: Ensure secret key matches public key
+2. **"Transaction failed"**: Check account has sufficient XLM for fees
+3. **"Contract not found"**: Verify testnet contracts are deployed
+4. **"Reserve not set"**: Some reserves may need queue time to expire
+
+### Support
+
+For issues with deployment, check:
+1. Browser console for detailed error messages
+2. Network tab for API call responses
+3. Stellar Expert for transaction details
+4. Testnet contract addresses in configuration
+
+## Architecture
 
 ```
-Frontend (Next.js) → API Routes → Existing Scripts → Stellar Network
-     ↓                  ↓              ↓
-User Input     →  Validation  →  Deployment  →  Pool Created
-Wallet Sign    →  TX Building →  Submission  →  Confirmation
+User Interface (React)
+    ↓
+Deployment Service (TypeScript)
+    ↓
+Blend SDK V2
+    ↓
+Stellar Soroban RPC
+    ↓
+Testnet Blockchain
 ```
 
-## Wallet Integration
-
-### Current Implementation
-
-The `WalletConnect` component handles:
-- Freighter wallet detection and connection
-- Public key retrieval
-- Connection status management
-- Network-aware display
-
-### Wallet Interface
-
-```typescript
-interface WalletInfo {
-  publicKey: string;
-  isConnected: boolean;
-  walletType: string;
-}
-```
-
-## API Integration Points
-
-### 1. `/api/deploy-pool/route.ts`
-
-**Current:** Simulated deployment with validation
-**Next:** Replace with real deployment logic
-
-```typescript
-// Replace the simulated deployment section with:
-import { setupPool, setupReserve } from '../../../src/utils/pool-setup';
-import { AddressBook } from '../../../src/utils/address-book';
-import envConfig from '../../../src/utils/env_config';
-
-export async function POST(request: NextRequest) {
-  try {
-    const config: PoolConfiguration = await request.json();
-    
-    // 1. Set up network configuration
-    const network = envConfig(config.basics.network);
-    const addressBook = new AddressBook(network);
-    
-    // 2. Create admin keypair from connected wallet
-    // Note: In production, transactions would be signed by the user's wallet
-    const adminKeypair = Keypair.fromPublicKey(config.wallet.publicKey);
-    
-    // 3. Set up the pool
-    const poolResult = await setupPool({
-      name: config.basics.name,
-      salt: Buffer.from(config.basics.name).toString('hex'),
-      oracle: addressBook.getContractId('oracle'),
-      backstopTakeRate: config.basics.backstopTakeRate,
-      maxPositions: config.basics.maxPositions,
-      admin: adminKeypair,
-      addressBook,
-    });
-    
-    // 4. Set up reserves for each asset
-    for (const [index, asset] of config.selectedAssets.entries()) {
-      if (asset.enabled) {
-        const reserveConfig = config.reserveConfigs[index];
-        await setupReserve({
-          poolId: poolResult.poolAddress,
-          assetId: asset.contractId,
-          config: reserveConfig,
-          admin: adminKeypair,
-          addressBook,
-        });
-      }
-    }
-    
-    // 5. Configure emissions
-    if (config.emissions.length > 0) {
-      // Implementation for emission configuration
-    }
-    
-    return NextResponse.json({
-      success: true,
-      poolAddress: poolResult.poolAddress,
-      txHash: poolResult.txHash,
-      network: config.basics.network,
-      message: 'Pool deployed successfully',
-    });
-    
-  } catch (error) {
-    // Error handling
-  }
-}
-```
-
-## Real Transaction Flow
-
-### 1. Transaction Building
-```typescript
-// In the deployment API
-const transaction = await buildPoolDeploymentTransaction({
-  config,
-  network,
-  addressBook,
-});
-
-// Return unsigned transaction XDR to frontend
-return NextResponse.json({
-  success: true,
-  transactionXDR: transaction.toXDR(),
-  needsSignature: true,
-});
-```
-
-### 2. Transaction Signing (Frontend)
-```typescript
-// In the deployment summary component
-const signAndSubmitTransaction = async (transactionXDR: string) => {
-  try {
-    // Sign with connected wallet
-    const signedXDR = await window.freighter.signTransaction(
-      transactionXDR,
-      {
-        network: config.basics.network,
-        accountToSign: wallet.publicKey,
-      }
-    );
-    
-    // Submit signed transaction
-    const result = await fetch('/api/submit-transaction', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        signedXDR,
-        network: config.basics.network,
-      }),
-    });
-    
-    return await result.json();
-  } catch (error) {
-    console.error('Transaction signing failed:', error);
-    throw error;
-  }
-};
-```
-
-### 3. Transaction Submission
-```typescript
-// New API route: /api/submit-transaction/route.ts
-export async function POST(request: NextRequest) {
-  try {
-    const { signedXDR, network } = await request.json();
-    
-    const server = new Server(getNetworkUrl(network));
-    const transaction = TransactionBuilder.fromXDR(signedXDR, Networks[network]);
-    
-    const result = await server.submitTransaction(transaction);
-    
-    return NextResponse.json({
-      success: true,
-      txHash: result.hash,
-      poolAddress: extractPoolAddressFromResult(result),
-    });
-  } catch (error) {
-    return NextResponse.json({
-      success: false,
-      error: error.message,
-    }, { status: 500 });
-  }
-}
-```
-
-## Required Dependencies
-
-Add these to your `package.json`:
-
-```json
-{
-  "dependencies": {
-    "@stellar/stellar-sdk": "13.1.0",
-    "@blend-capital/blend-sdk": "3.0.0-beta.8"
-  }
-}
-```
-
-## Environment Configuration
-
-Create a `.env.local` file:
-
-```env
-NEXT_PUBLIC_STELLAR_NETWORK=testnet
-NEXT_PUBLIC_RPC_URL=https://rpc-futurenet.stellar.org:443
-STELLAR_ADMIN_SECRET=YOUR_ADMIN_SECRET_KEY
-```
-
-## Testing Checklist
-
-- [ ] Wallet connection works in browser
-- [ ] Network switching updates available assets
-- [ ] Form validation prevents invalid configurations
-- [ ] Transaction building succeeds with valid config
-- [ ] Transaction signing works with Freighter
-- [ ] Pool deployment creates working pool
-- [ ] Error handling covers edge cases
-
-## Security Considerations
-
-1. **Private Key Management**: Never store private keys in frontend code
-2. **Transaction Validation**: Always validate transactions before signing
-3. **Network Verification**: Ensure transactions target correct network
-4. **Error Handling**: Don't expose sensitive information in error messages
-
-## Production Deployment
-
-1. Replace simulation with real deployment logic
-2. Add comprehensive error handling
-3. Implement transaction status monitoring
-4. Add support for additional wallets (Albedo, xBull, etc.)
-5. Set up proper environment variables
-6. Add transaction history and pool management features
-
-## Existing Script Integration
-
-The existing deployment scripts in `src/v2/user-scripts/deploy-pool.ts` can be adapted for the frontend by:
-
-1. Extracting core deployment logic into reusable functions
-2. Modifying to accept configuration objects instead of hardcoded values
-3. Adding transaction building without automatic submission
-4. Integrating with the address book and environment configuration
-
-This approach maintains compatibility with existing scripts while enabling the user-friendly frontend interface. 
+The implementation follows the same patterns as the backend deployment scripts but provides a user-friendly web interface for non-technical users. 

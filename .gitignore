@@ -39,3 +39,17 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+node_modules
+dist
+lib
+.DS_Store
+
+temp.ts
+*/local
+
+# configuration files
+.env
+*.contracts.json
+!futurenet.contracts.json
+!testnet.contracts.json
+!mainnet.contracts.json

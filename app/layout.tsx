@@ -13,8 +13,30 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Blend Pool Creator | Terminal",
-  description: "Create and deploy lending pools on the Blend Protocol - Terminal Interface",
+  title: "Blend Pool Creator | Stellar Lending Pool Deployment",
+  description: "Modern web interface for creating and deploying custom lending pools on the Stellar blockchain using the Blend Protocol. Enterprise-grade security with testnet-only deployment.",
+  keywords: ["Stellar", "Blend Protocol", "DeFi", "Lending Pool", "Soroban", "Blockchain", "Cryptocurrency"],
+  authors: [{ name: "Blend Protocol Community" }],
+
+  openGraph: {
+    title: "Blend Pool Creator",
+    description: "Create and deploy lending pools on the Stellar blockchain with the Blend Protocol",
+    images: [
+      {
+        url: '/logo.png',
+        width: 1200,
+        height: 630,
+        alt: 'Blend Pool Creator',
+      }
+    ],
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: "Blend Pool Creator",
+    description: "Create and deploy lending pools on the Stellar blockchain with the Blend Protocol",
+    images: ['/logo.png'],
+  },
 };
 
 export default function RootLayout({

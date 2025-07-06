@@ -13,7 +13,9 @@ import {
   Transaction,
   TransactionBuilder,
   xdr,
-  Operation
+  Operation,
+  Asset,
+  Address
 } from '@stellar/stellar-sdk';
 import testnetContracts from '@/lib/contracts/testnet.contracts.json';
 import mainnetContracts from '@/lib/contracts/mainnet.contracts.json';
@@ -120,20 +122,10 @@ const RISK_PRESETS = {
   }
 };
 
-// Contract addresses for different networks
-const CONTRACT_ADDRESSES: Record<string, Record<string, string>> = {
-  testnet: {
-    poolFactory: testnetContracts.ids.poolFactoryV2,
-    oracle: testnetContracts.ids.oraclemock
-  },
-  mainnet: {
-    poolFactory: mainnetContracts.ids.poolFactoryV2,
-    oracle: testnetContracts.ids.oraclemock // Fallback to testnet oracle mock
-  },
-  futurenet: {
-    poolFactory: futurenetContracts.ids.poolFactory,
-    oracle: futurenetContracts.ids.oracle
-  }
+// Contract addresses for testnet only
+const CONTRACT_ADDRESSES = {
+  poolFactory: testnetContracts.ids.poolFactoryV2,
+  oracle: testnetContracts.ids.oraclemock
 };
 
 export class DeploymentService {
@@ -142,12 +134,33 @@ export class DeploymentService {
   private network: string;
 
   constructor(network: string) {
+    // Restrict to testnet only
+    if (network !== 'testnet') {
+      throw new Error('Only testnet deployments are supported');
+    }
+    
     this.network = network;
     this.networkConfig = NETWORK_CONFIGS[network];
     if (!this.networkConfig) {
       throw new Error(`Unsupported network: ${network}`);
     }
     this.rpcClient = new rpc.Server(this.networkConfig.rpcUrl, { allowHttp: true });
+  }
+
+  /**
+   * Convert asset address to proper contract format
+   * Handles native assets and regular contract assets
+   */
+  private convertAssetAddress(assetAddress: string): string {
+    if (assetAddress === 'native') {
+      // For Stellar native asset (XLM), create the contract address for native asset
+      // Use the special native asset contract address for Soroban
+      const nativeAssetAddress = Address.contract(Buffer.alloc(32, 0)).toString();
+      return nativeAssetAddress;
+    }
+    
+    // For other assets, return the contract address as-is
+    return assetAddress;
   }
 
   /**
@@ -167,7 +180,7 @@ export class DeploymentService {
     reserveConfigs: ReserveConfigV2[];
     emissionMetadata: ReserveEmissionMetadata[];
   } {
-    const contractAddresses = CONTRACT_ADDRESSES[this.network];
+    const contractAddresses = CONTRACT_ADDRESSES;
     if (!contractAddresses) {
       throw new Error(`Contract addresses not configured for network: ${this.network}`);
     }
@@ -283,7 +296,7 @@ export class DeploymentService {
     transactionHashes: string[];
   }> {
     try {
-      const contractAddresses = CONTRACT_ADDRESSES[this.network];
+      const contractAddresses = CONTRACT_ADDRESSES;
       if (!contractAddresses) {
         throw new Error(`Contract addresses not configured for network: ${this.network}`);
       }
@@ -343,67 +356,79 @@ export class DeploymentService {
         const reserveConfig = reserveConfigs[i];
 
         console.log(`Setting up reserve for ${asset.symbol} with address: ${asset.address}`);
+        
+        // Convert asset address to proper format
+        const contractAssetAddress = this.convertAssetAddress(asset.address);
+        console.log(`Converted asset address: ${asset.address} -> ${contractAssetAddress}`);
 
         const setReserveArgs: SetReserveArgs = {
-          asset: asset.address,
+          asset: contractAssetAddress,
           metadata: reserveConfig
         };
 
-        // Queue reserve
-        const queueReserveOp = pool.queueSetReserve(setReserveArgs);
-        
-        const queueTxBuilder = new TransactionBuilder(userAccount, {
-          fee: '10000',
-          networkPassphrase: this.networkConfig.passphrase,
-        });
-        
-                 queueTxBuilder.addOperation(xdr.Operation.fromXDR(queueReserveOp, 'base64'));
-        queueTxBuilder.setTimeout(30);
-        
-        const queueTx = queueTxBuilder.build();
-        queueTx.sign(userKeypair);
-
-        const queueSimResult = await this.rpcClient.simulateTransaction(queueTx);
-        if (rpc.Api.isSimulationError(queueSimResult)) {
-          throw new Error(`Reserve queue simulation failed for ${asset.symbol}: ${queueSimResult.error}`);
-        }
-
-        const assembledQueueTx = rpc.assembleTransaction(queueTx, queueSimResult).build();
-        assembledQueueTx.sign(userKeypair);
-        
-        const queueTxHash = await this.submitTransaction(assembledQueueTx);
-        transactionHashes.push(queueTxHash);
-
-        // Set reserve
         try {
-          const setReserveOp = pool.setReserve(asset.address);
+          // Queue reserve
+          console.log(`Queuing reserve for ${asset.symbol}...`);
+          const queueReserveOp = pool.queueSetReserve(setReserveArgs);
           
-          const setTxBuilder = new TransactionBuilder(userAccount, {
+          const queueTxBuilder = new TransactionBuilder(userAccount, {
             fee: '10000',
             networkPassphrase: this.networkConfig.passphrase,
           });
           
-                     setTxBuilder.addOperation(xdr.Operation.fromXDR(setReserveOp, 'base64'));
-          setTxBuilder.setTimeout(30);
+          queueTxBuilder.addOperation(xdr.Operation.fromXDR(queueReserveOp, 'base64'));
+          queueTxBuilder.setTimeout(30);
           
-          const setTx = setTxBuilder.build();
-          setTx.sign(userKeypair);
+          const queueTx = queueTxBuilder.build();
+          queueTx.sign(userKeypair);
 
-          const setSimResult = await this.rpcClient.simulateTransaction(setTx);
-          if (rpc.Api.isSimulationError(setSimResult)) {
-            console.warn(`Reserve set simulation failed for ${asset.symbol}, may need to wait: ${setSimResult.error}`);
-            continue;
+          const queueSimResult = await this.rpcClient.simulateTransaction(queueTx);
+          if (rpc.Api.isSimulationError(queueSimResult)) {
+            throw new Error(`Reserve queue simulation failed for ${asset.symbol}: ${queueSimResult.error}`);
           }
 
-          const assembledSetTx = rpc.assembleTransaction(setTx, setSimResult).build();
-          assembledSetTx.sign(userKeypair);
+          const assembledQueueTx = rpc.assembleTransaction(queueTx, queueSimResult).build();
+          assembledQueueTx.sign(userKeypair);
           
-          const setTxHash = await this.submitTransaction(assembledSetTx);
-          transactionHashes.push(setTxHash);
-          
-          console.log(`Successfully set ${asset.symbol} reserve`);
+          const queueTxHash = await this.submitTransaction(assembledQueueTx);
+          transactionHashes.push(queueTxHash);
+          console.log(`Successfully queued reserve for ${asset.symbol}, txHash: ${queueTxHash}`);
+
+          // Set reserve
+          try {
+            console.log(`Setting reserve for ${asset.symbol}...`);
+            const setReserveOp = pool.setReserve(contractAssetAddress);
+            
+            const setTxBuilder = new TransactionBuilder(userAccount, {
+              fee: '10000',
+              networkPassphrase: this.networkConfig.passphrase,
+            });
+            
+            setTxBuilder.addOperation(xdr.Operation.fromXDR(setReserveOp, 'base64'));
+            setTxBuilder.setTimeout(30);
+            
+            const setTx = setTxBuilder.build();
+            setTx.sign(userKeypair);
+
+            const setSimResult = await this.rpcClient.simulateTransaction(setTx);
+            if (rpc.Api.isSimulationError(setSimResult)) {
+              console.warn(`Reserve set simulation failed for ${asset.symbol}, may need to wait: ${setSimResult.error}`);
+              continue;
+            }
+
+            const assembledSetTx = rpc.assembleTransaction(setTx, setSimResult).build();
+            assembledSetTx.sign(userKeypair);
+            
+            const setTxHash = await this.submitTransaction(assembledSetTx);
+            transactionHashes.push(setTxHash);
+            
+            console.log(`Successfully set ${asset.symbol} reserve, txHash: ${setTxHash}`);
+          } catch (error) {
+            console.warn(`Could not set reserve for ${asset.symbol} immediately, may need to wait for queue time: ${error}`);
+          }
         } catch (error) {
-          console.warn(`Could not set reserve for ${asset.symbol} immediately, may need to wait for queue time: ${error}`);
+          console.error(`Failed to process reserve for ${asset.symbol}:`, error);
+          throw new Error(`Failed to setup reserve for ${asset.symbol}: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
       }
 
@@ -509,7 +534,7 @@ export class DeploymentService {
     }
 
     // Check if contract addresses exist for the network
-    const contractAddresses = CONTRACT_ADDRESSES[this.network];
+    const contractAddresses = CONTRACT_ADDRESSES;
     if (!contractAddresses) {
       errors.push(`Contract addresses not configured for network: ${this.network}`);
     }
