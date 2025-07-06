@@ -152,15 +152,36 @@ export class DeploymentService {
    * Handles native assets and regular contract assets
    */
   private convertAssetAddress(assetAddress: string): string {
+    console.log(`Converting asset address: ${assetAddress}`);
+    
     if (assetAddress === 'native') {
       // For Stellar native asset (XLM), create the contract address for native asset
       // Use the special native asset contract address for Soroban
       const nativeAssetAddress = Address.contract(Buffer.alloc(32, 0)).toString();
+      console.log(`Native asset converted to: ${nativeAssetAddress}`);
       return nativeAssetAddress;
     }
     
-    // For other assets, return the contract address as-is
-    return assetAddress;
+    // Validate address format
+    if (!assetAddress || typeof assetAddress !== 'string') {
+      throw new Error(`Invalid asset address: ${assetAddress}`);
+    }
+    
+    // Check if it's a Stellar Classic address format (starts with C and is 56 characters)
+    if (assetAddress.startsWith('C') && assetAddress.length === 56) {
+      try {
+        // Try to parse and validate the address using Stellar SDK
+        const address = Address.fromString(assetAddress);
+        const convertedAddress = address.toString();
+        console.log(`Address validated and converted: ${assetAddress} -> ${convertedAddress}`);
+        return convertedAddress;
+      } catch (error) {
+        console.error(`Failed to parse Stellar address ${assetAddress}:`, error);
+        throw new Error(`Invalid Stellar address format: ${assetAddress} - ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    }
+    
+    throw new Error(`Unsupported address format: ${assetAddress}. Expected either 'native' or a valid Stellar contract address starting with 'C' and 56 characters long.`);
   }
 
   /**
@@ -358,8 +379,15 @@ export class DeploymentService {
         console.log(`Setting up reserve for ${asset.symbol} with address: ${asset.address}`);
         
         // Convert asset address to proper format
-        const contractAssetAddress = this.convertAssetAddress(asset.address);
-        console.log(`Converted asset address: ${asset.address} -> ${contractAssetAddress}`);
+        let contractAssetAddress: string;
+        try {
+          contractAssetAddress = this.convertAssetAddress(asset.address);
+          console.log(`Successfully converted asset address for ${asset.symbol}: ${asset.address} -> ${contractAssetAddress}`);
+        } catch (error) {
+          const errorMessage = `Failed to convert asset address for ${asset.symbol} (${asset.address}): ${error instanceof Error ? error.message : 'Unknown error'}`;
+          console.error(errorMessage);
+          throw new Error(errorMessage);
+        }
 
         const setReserveArgs: SetReserveArgs = {
           asset: contractAssetAddress,

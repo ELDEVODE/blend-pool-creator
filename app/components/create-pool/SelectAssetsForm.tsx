@@ -12,10 +12,10 @@ interface SelectAssetsFormProps {
 // Popular testnet assets
 const POPULAR_ASSETS = [
   { id: 'XLM', symbol: 'XLM', name: 'Stellar Lumens', address: 'native', decimals: 7, popular: true },
-  { id: 'USDC', symbol: 'USDC', name: 'USD Coin', address: 'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA', decimals: 6, popular: true },
-  { id: 'BLND', symbol: 'BLND', name: 'Blend Token', address: 'CD25MNVTZDL4Y3XBCPCJXGXATV5WUHHOWMYFF4YBEGU5FCPGMYTVG5JY', decimals: 7, popular: true },
-  { id: 'wETH', symbol: 'wETH', name: 'Wrapped Ethereum', address: 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQAHHAGCN4YU', decimals: 18, popular: true },
-  { id: 'wBTC', symbol: 'wBTC', name: 'Wrapped Bitcoin', address: 'CAQCFVLOBK5GIULPNZRGATJJMIZL5BSP7X5YJVMKQBGXXLILMVUPCYZD', decimals: 8, popular: true },
+  { id: 'USDC', symbol: 'USDC', name: 'USD Coin', address: 'CAQCFVLOBK5GIULPNZRGATJJMIZL5BSP7X5YJVMGCPTUEPFM4AVSRCJU', decimals: 7, popular: true },
+  { id: 'BLND', symbol: 'BLND', name: 'Blend Token', address: 'CB22KRA3YZVCNCQI64JQ5WE7UY2VAV7WFLK6A2JN3HEX56T2EDAFO7QF', decimals: 7, popular: true },
+  // { id: 'wETH', symbol: 'wETH', name: 'Wrapped Ethereum', address: 'CAZAQB3D7KSLSNOSQKYD2V4JP5V2Y3B4RDJZRLBFCCIXDCTE3WHSY3UE', decimals: 8, popular: true },
+  // { id: 'wBTC', symbol: 'wBTC', name: 'Wrapped Bitcoin', address: 'CAP5AMC2OHNVREO66DFIN6DHJMPOBAJ2KCDDIMFBR7WWJH5RZBFM3UEI', decimals: 8, popular: true },
 ];
 
 export default function SelectAssetsForm({ config, updateConfig }: SelectAssetsFormProps) {

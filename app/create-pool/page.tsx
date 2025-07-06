@@ -246,7 +246,7 @@ export default function CreatePoolPage() {
     name: '',
     network: 'testnet', // Fixed to testnet only
     backstopTakeRate: 0.1, // 10%
-    maxPositions: 4,
+    maxPositions: 3,
     minCollateral: 0,
     selectedAssets: [],
     riskParameters: { preset: 'balanced' },
@@ -301,7 +301,7 @@ export default function CreatePoolPage() {
           return 'Please select at least one asset for your pool';
         }
         if (poolConfig.selectedAssets.length > (poolConfig.maxPositions || 4)) {
-          return `You can select at most ${poolConfig.maxPositions || 4} assets (current max positions setting)`;
+          return `You can select at most ${poolConfig.maxPositions || 3} assets (current max positions setting)`;
         }
         return null;
       case 'risk':
